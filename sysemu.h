@@ -172,6 +172,15 @@ int do_pcie_aer_inject_error(Monitor *mon,
 
 extern CharDriverState *serial_hds[MAX_SERIAL_PORTS];
 
+/* VMsocket */
+
+#define MAX_VMSOCKET_DEVICES 1
+
+extern CharDriverState * vmsocket_chardev;
+void vmsocket_init(const char * optarg);
+int vmsocket_get_buffer_size(void);
+
+
 /* parallel ports */
 
 #define MAX_PARALLEL_PORTS 3

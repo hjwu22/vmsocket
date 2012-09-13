@@ -276,6 +276,9 @@ static int default_cdrom = 1;
 static int default_sdcard = 1;
 static int default_vga = 1;
 
+/* VMSocket */
+int vmsocket_enabled = 0;
+
 static struct {
     const char *driver;
     int *flag;
@@ -3288,6 +3291,10 @@ int main(int argc, char **argv, char **envp)
                     exit(0);
                 }
                 break;
+	    case QEMU_OPTION_vmsocket:
+		vmsocket_device = strdup(optarg);
+		vmsocket_enabled = 1;
+		break;
             default:
                 os_parse_cmd_args(popt->index, optarg);
             }
@@ -3599,7 +3606,10 @@ int main(int argc, char **argv, char **envp)
         vga_model = "cirrus";
     }
     select_vgahw(vga_model);
-
+    if (vmsocket_enabled) {
+        vmsocket_init(vmsocket_device);
+        ram_size += vmsocket_get_buffer_size();
+    }
     if (watchdog) {
         i = select_watchdog(watchdog);
         if (i > 0)

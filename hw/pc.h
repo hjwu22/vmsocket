@@ -9,7 +9,9 @@
 #include "net.h"
 #include "memory.h"
 #include "ioapic.h"
-
+extern int vmsocket_enabled;
+extern char *vmsocket_device;
+void pci_vmsocket_init(PCIBus *bus);
 /* PC-style peripherals (also used by other machines).  */
 
 /* serial.c */
