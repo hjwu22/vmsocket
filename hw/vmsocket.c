@@ -250,22 +250,26 @@ static int pci_vmsocket_initfn(PCIDevice *dev)
     /* Registers */
     //s->regs_addr = cpu_register_io_memory(vmsocket_regs_read,
     //                                      vmsocket_regs_write, s);
+    s->regs = g_malloc(sizeof(MemoryRegion));
     memory_region_init_io(s->regs, &regs_ops, d, "vmsocket.regs", 0x100);
+    
    // memory_region_add_subregion(address_space_mem, 0, ram);
 
     /* I/O Buffers */
     s->inbuffer_size = INBUF_SIZE; /* FIXME: make it configurable */
     //s->inbuffer_offset = qemu_ram_alloc(s->inbuffer_size);
-    s->inbuffer = qemu_get_ram_ptr(s->inbuffer_offset);
+    s->in_mem_region = g_malloc(sizeof(MemoryRegion));
     memory_region_init_ram(s->in_mem_region, "vmsocket.in", s->inbuffer_size);
     vmstate_register_ram_global(s->in_mem_region);
+    s->inbuffer = memory_region_get_ram_ptr(s->in_mem_region);
     //memory_region_add_subregion(address_space_mem, 0, ram);
 
     s->outbuffer_size = OUTBUF_SIZE; /* FIXME: make it configurable */
     //s->outbuffer_offset = qemu_ram_alloc(s->outbuffer_size);
-    s->outbuffer = qemu_get_ram_ptr(s->outbuffer_offset);
+    s->out_mem_region = g_malloc(sizeof(MemoryRegion));    
     memory_region_init_ram(s->out_mem_region, "vmsocket.out", s->outbuffer_size);
     vmstate_register_ram_global(s->in_mem_region);
+    s->outbuffer = memory_region_get_ram_ptr(s->out_mem_region);
     //memory_region_add_subregion(address_space_mem, 0, ram);
 
     /* PCI config */
@@ -319,11 +323,11 @@ static void vmsocket_class_init(ObjectClass *klass, void *data)
     k->class_id = PCI_CLASS_OTHERS;
     //dc->vmsd = &vmstate_vga_pci;
     //dc->props = vga_pci_properties;
-    dc->desc = "VMSocket";
+    dc->desc = "vmsocket";
 }
 
 static TypeInfo vmsocket_info = {
-    .name          = "VMSocket",
+    .name          = "vmsocket",
     .parent        = TYPE_PCI_DEVICE,
     .instance_size = sizeof(PCI_VMSocketState),
     .class_init    = vmsocket_class_init,
