@@ -260,7 +260,7 @@ static int pci_vmsocket_initfn(PCIDevice *dev)
     //s->inbuffer_offset = qemu_ram_alloc(s->inbuffer_size);
     s->in_mem_region = g_malloc(sizeof(MemoryRegion));
     memory_region_init_ram(s->in_mem_region, "vmsocket.in", s->inbuffer_size);
-    vmstate_register_ram_global(s->in_mem_region);
+    //vmstate_register_ram_global(s->in_mem_region);
     s->inbuffer = memory_region_get_ram_ptr(s->in_mem_region);
     //memory_region_add_subregion(address_space_mem, 0, ram);
 
@@ -268,7 +268,7 @@ static int pci_vmsocket_initfn(PCIDevice *dev)
     //s->outbuffer_offset = qemu_ram_alloc(s->outbuffer_size);
     s->out_mem_region = g_malloc(sizeof(MemoryRegion));    
     memory_region_init_ram(s->out_mem_region, "vmsocket.out", s->outbuffer_size);
-    vmstate_register_ram_global(s->in_mem_region);
+    //vmstate_register_ram_global(s->in_mem_region);
     s->outbuffer = memory_region_get_ram_ptr(s->out_mem_region);
     //memory_region_add_subregion(address_space_mem, 0, ram);
 
