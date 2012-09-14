@@ -11,7 +11,12 @@
 #include "ioapic.h"
 extern int vmsocket_enabled;
 extern char *vmsocket_device;
-void pci_vmsocket_init(PCIBus *bus);
+DeviceState *pci_vmsocket_init(PCIBus *bus);
+extern CharDriverState * vmsocket_chardev;
+void vmsocket_init(const char * optarg);
+int vmsocket_get_buffer_size(void);
+#define MAX_VMSOCKET_DEVICES 1
+
 /* PC-style peripherals (also used by other machines).  */
 
 /* serial.c */

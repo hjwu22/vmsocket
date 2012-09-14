@@ -2302,7 +2302,7 @@ ETEXI
 
 DEF("vmsocket", HAS_ARG, QEMU_OPTION_vmsocket, \
     "-vmsocket file connects to AF_UNIX socket PCI card server \
-    listening on 'path' and exposes as a PCI device in the guest\n")
+    listening on 'path' and exposes as a PCI device in the guest\n", QEMU_ARCH_ALL)
 STEXI
 @item -vmsocket @var{file}
 Connects to AF_UNIX socket PCI card server listening on 'path' and exposes \

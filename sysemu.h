@@ -174,11 +174,11 @@ extern CharDriverState *serial_hds[MAX_SERIAL_PORTS];
 
 /* VMsocket */
 
-#define MAX_VMSOCKET_DEVICES 1
+//#define MAX_VMSOCKET_DEVICES 1
 
-extern CharDriverState * vmsocket_chardev;
-void vmsocket_init(const char * optarg);
-int vmsocket_get_buffer_size(void);
+//extern CharDriverState * vmsocket_chardev;
+//void vmsocket_init(const char * optarg);
+//int vmsocket_get_buffer_size(void);
 
 
 /* parallel ports */

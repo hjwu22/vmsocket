@@ -229,7 +229,7 @@ static void pc_init1(MemoryRegion *system_memory,
     if (xen_enabled()) {
         pci_create_simple(pci_bus, -1, "xen-platform");
     }
-    if (pci_enabledi && vmsocket_enabled)
+    if (pci_enabled && vmsocket_enabled)
 	pci_vmsocket_init(pci_bus);
     /* init basic PC hardware */
     pc_basic_device_init(isa_bus, gsi, &rtc_state, &floppy, xen_enabled());
