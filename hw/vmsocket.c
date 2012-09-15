@@ -26,8 +26,8 @@
 #define PCI_COMMAND_MEMACCESS               0x0002
 #define PCI_COMMAND_BUSMASTER               0x0004
 
-//#undef DEBUG_VMSOCKET
-#define DEBUG_VMSOCKET
+#undef DEBUG_VMSOCKET
+//#define DEBUG_VMSOCKET
 #ifdef DEBUG_VMSOCKET
 #define VMSOCKET_DPRINTF(fmt, args...)                  \
     do {printf("VMSOCKET: " fmt, ##args); } while (0)
@@ -91,6 +91,9 @@ static void vmsocket_write(VMSocketState *s, uint32_t count)
 {
     s->status = write(s->fd, s->outbuffer, count);
     fsync(s->fd);
+#ifdef DEBUG_VMSOCKET
+    perror("write");
+#endif
     VMSOCKET_DPRINTF("Write request: count: %u status: %d\n", count,
                      s->status);
 }
@@ -110,6 +113,7 @@ static void *vmsocket_read_begin(void *arg)
 static void vmsocket_regs_writew(void *opaque, target_phys_addr_t addr,
                                  uint32_t val) {
     VMSocketState * s = opaque;
+    VMSOCKET_DPRINTF("sock file:%s\n",vmsocket_device);
     switch(addr & 0xFF) {
     case VMSOCKET_CONNECT_W_REG:
         s->fd = unix_connect(vmsocket_device);
@@ -129,6 +133,7 @@ static void vmsocket_regs_writew(void *opaque, target_phys_addr_t addr,
 static void vmsocket_regs_writel(void *opaque, target_phys_addr_t addr,
                                  uint32_t val) {
     VMSocketState * s = opaque;
+    VMSOCKET_DPRINTF("s: %p\n", s);
     switch(addr & 0xFF) {
     case VMSOCKET_WRITE_COMMIT_L_REG:
         VMSOCKET_DPRINTF("WriteCommit: count: %u.\n", val);
@@ -154,12 +159,6 @@ static void vmsocket_regs_writel(void *opaque, target_phys_addr_t addr,
     }
 }
 
-//static CPUWriteMemoryFunc *vmsocket_regs_write[3] = {
-//    NULL,
-//    vmsocket_regs_writew,
-//    vmsocket_regs_writel,
-//};
-
 static uint32_t vmsocket_regs_readl(void *opaque, target_phys_addr_t addr)
 {
     VMSocketState * s = opaque;
@@ -179,12 +178,6 @@ static uint32_t vmsocket_regs_readl(void *opaque, target_phys_addr_t addr)
     return 0;
 }
 
-//static CPUReadMemoryFunc *vmsocket_regs_read[3] = {
-//    NULL,
-//    NULL,
-//    vmsocket_regs_readl,
-//};
-
 static const MemoryRegionOps regs_ops = {
     .old_mmio = {
         .write = {NULL, vmsocket_regs_writew, vmsocket_regs_writel},
@@ -193,32 +186,6 @@ static const MemoryRegionOps regs_ops = {
     .endianness = DEVICE_NATIVE_ENDIAN,
 };
 
-/*
-static void vmsocket_region_map(PCIDevice *pci_dev, int region_num,
-                                pcibus_t addr, pcibus_t size, int type) {
-
-    PCI_VMSocketState *d = (PCI_VMSocketState *) pci_dev;
-    VMSocketState *s = &d->vmsocket_state;
-
-    switch(region_num) {
-    case 0:
-        VMSOCKET_DPRINTF("Register regs at 0x%x.\n", (unsigned) addr);
-        cpu_register_physical_memory(addr, 0x100, s->regs_addr);
-        break;
-    case 1:
-        VMSOCKET_DPRINTF("Register input buffer at 0x%x.\n",
-                         (unsigned) addr);
-        cpu_register_physical_memory(addr, s->inbuffer_size,
-                                     s->inbuffer_offset);
-        break;
-    case 2:
-        VMSOCKET_DPRINTF("Register output buffer at 0x%x.\n",
-                         (unsigned) addr);
-        cpu_register_physical_memory(addr, s->outbuffer_size,
-                                     s->outbuffer_offset);
-        break;
-    }
-}*/
 
 static int pci_vmsocket_initfn(PCIDevice *dev) 
 {
@@ -230,62 +197,28 @@ static int pci_vmsocket_initfn(PCIDevice *dev)
     s->pci_dev = &d->dev;
     
     VMSOCKET_DPRINTF("Enabled!\n");
-    
+    VMSOCKET_DPRINTF("s: %p, s->pci_dev: %p\n", s, s->pci_dev);    
     pci_conf[PCI_HEADER_TYPE] = PCI_HEADER_TYPE_NORMAL; // header_type
     pci_conf[PCI_INTERRUPT_PIN] = 1; // we are going to support interrupts
 
-    //d = (PCI_VMSocketState *) pci_register_device(bus, "kvm_vmsocket",
-     //                                             sizeof
-    //                                              (PCI_VMSocketState), -1,
-    //                                              NULL, NULL);
-
-    //if (d == NULL) {
-    //    VMSOCKET_DPRINTF("Can't register pci device.\n");
-    //    return;
-    //}
-
-    
-    //MemoryRegion *address_space_mem = get_system_memory();
-    
-    /* Registers */
-    //s->regs_addr = cpu_register_io_memory(vmsocket_regs_read,
-    //                                      vmsocket_regs_write, s);
     s->regs = g_malloc(sizeof(MemoryRegion));
-    memory_region_init_io(s->regs, &regs_ops, d, "vmsocket.regs", 0x100);
+    memory_region_init_io(s->regs, &regs_ops, s, "vmsocket.regs", 0x100);
     
-   // memory_region_add_subregion(address_space_mem, 0, ram);
 
     /* I/O Buffers */
     s->inbuffer_size = INBUF_SIZE; /* FIXME: make it configurable */
-    //s->inbuffer_offset = qemu_ram_alloc(s->inbuffer_size);
     s->in_mem_region = g_malloc(sizeof(MemoryRegion));
     memory_region_init_ram(s->in_mem_region, "vmsocket.in", s->inbuffer_size);
-    //vmstate_register_ram_global(s->in_mem_region);
     s->inbuffer = memory_region_get_ram_ptr(s->in_mem_region);
-    //memory_region_add_subregion(address_space_mem, 0, ram);
 
     s->outbuffer_size = OUTBUF_SIZE; /* FIXME: make it configurable */
-    //s->outbuffer_offset = qemu_ram_alloc(s->outbuffer_size);
     s->out_mem_region = g_malloc(sizeof(MemoryRegion));    
     memory_region_init_ram(s->out_mem_region, "vmsocket.out", s->outbuffer_size);
-    //vmstate_register_ram_global(s->in_mem_region);
     s->outbuffer = memory_region_get_ram_ptr(s->out_mem_region);
-    //memory_region_add_subregion(address_space_mem, 0, ram);
 
-    /* PCI config */
-    //pci_conf = d->dev.config;
-    //pci_config_set_vendor_id(pci_conf, PCI_VENDOR_ID_REDHAT_QUMRANET);
-    //pci_config_set_device_id(pci_conf, 0x6662);
-    //pci_config_set_class(pci_conf, PCI_CLASS_OTHERS);
     
 
     /* Regions */
-    //pci_register_bar(&d->dev, 0, 0x100, PCI_BASE_ADDRESS_SPACE_MEMORY,
-   //                  vmsocket_region_map);
-    //pci_register_bar(&d->dev, 1, s->inbuffer_size, PCI_BASE_ADDRESS_SPACE_MEMORY,
-     //                vmsocket_region_map);
-    //pci_register_bar(&d->dev, 2, s->outbuffer_size, PCI_BASE_ADDRESS_SPACE_MEMORY,
-    //                 vmsocket_region_map);
 
     pci_register_bar(&d->dev, 0,  PCI_BASE_ADDRESS_SPACE_MEMORY,
                      s->regs);
@@ -295,7 +228,7 @@ static int pci_vmsocket_initfn(PCIDevice *dev)
                      s->out_mem_region);
 
     s->interrupt = 0;
-    qemu_set_irq(dev->irq[0], 0);
+    qemu_set_irq(s->pci_dev->irq[0], 0);
 
     s->count = 0;
     s->readed = 0;
@@ -316,6 +249,7 @@ static void vmsocket_class_init(ObjectClass *klass, void *data)
     DeviceClass *dc = DEVICE_CLASS(klass);
     PCIDeviceClass *k = PCI_DEVICE_CLASS(klass);
 
+    /* PCI config */
     k->no_hotplug = 1;
     k->init = pci_vmsocket_initfn;
     k->vendor_id = PCI_VENDOR_ID_REDHAT_QUMRANET;
