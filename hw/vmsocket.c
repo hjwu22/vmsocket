@@ -113,7 +113,7 @@ static void *vmsocket_read_begin(void *arg)
 static void vmsocket_regs_writew(void *opaque, target_phys_addr_t addr,
                                  uint32_t val) {
     VMSocketState * s = opaque;
-    VMSOCKET_DPRINTF("sock file:%s\n",vmsocket_device);
+    //VMSOCKET_DPRINTF("sock file:%s\n",vmsocket_device);
     switch(addr & 0xFF) {
     case VMSOCKET_CONNECT_W_REG:
         s->fd = unix_connect(vmsocket_device);
@@ -133,7 +133,8 @@ static void vmsocket_regs_writew(void *opaque, target_phys_addr_t addr,
 static void vmsocket_regs_writel(void *opaque, target_phys_addr_t addr,
                                  uint32_t val) {
     VMSocketState * s = opaque;
-    VMSOCKET_DPRINTF("s: %p\n", s);
+    //VMSocketState * s = NULL;
+    //VMSOCKET_DPRINTF("s: %p\n", s);
     switch(addr & 0xFF) {
     case VMSOCKET_WRITE_COMMIT_L_REG:
         VMSOCKET_DPRINTF("WriteCommit: count: %u.\n", val);
@@ -244,6 +245,17 @@ DeviceState *pci_vmsocket_init(PCIBus *bus)
 {
     return &pci_create_simple(bus, -1, "vmsocket")->qdev;
 }
+static void pci_vmsocket_exit(PCIDevice *dev)
+{
+     PCI_VMSocketState *d = DO_UPCAST(PCI_VMSocketState, dev, dev);
+     VMSocketState *s = &d->vmsocket_state;
+     memory_region_destroy(s->regs);
+     memory_region_destroy(s->in_mem_region);
+     memory_region_destroy(s->out_mem_region);
+    // msix_uninit_exclusive_bar(pci_dev);
+    // i
+    VMSOCKET_DPRINTF("exit");
+}
 static void vmsocket_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
@@ -252,6 +264,7 @@ static void vmsocket_class_init(ObjectClass *klass, void *data)
     /* PCI config */
     k->no_hotplug = 1;
     k->init = pci_vmsocket_initfn;
+    k->exit = pci_vmsocket_exit;
     k->vendor_id = PCI_VENDOR_ID_REDHAT_QUMRANET;
     k->device_id = 0x6662;
     k->class_id = PCI_CLASS_OTHERS;
