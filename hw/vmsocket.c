@@ -82,6 +82,7 @@ typedef struct PCI_VMSocketState {
 } PCI_VMSocketState;
 
 char *vmsocket_device = NULL;
+static GThreadPool *threadPool;
 
 void vmsocket_init(const char * optarg) {
     //chardev = strdup(strchr(optarg, ':') + 1);
@@ -98,7 +99,7 @@ static void vmsocket_write(VMSocketState *s, uint32_t count)
                      s->status);
 }
 
-static void *vmsocket_read_begin(void *arg)
+static void vmsocket_read_begin(gpointer arg, gpointer user_data )
 {
     VMSocketState *s = (VMSocketState *) arg;
     pthread_mutex_lock(&s->mutex);
@@ -107,7 +108,7 @@ static void *vmsocket_read_begin(void *arg)
                      (unsigned) s->readed);
     s->interrupt = 1;
     qemu_set_irq(s->pci_dev->irq[0], 1);
-    return NULL;
+    //return NULL;
 }
 
 static void vmsocket_regs_writew(void *opaque, target_phys_addr_t addr,
@@ -133,8 +134,7 @@ static void vmsocket_regs_writew(void *opaque, target_phys_addr_t addr,
 static void vmsocket_regs_writel(void *opaque, target_phys_addr_t addr,
                                  uint32_t val) {
     VMSocketState * s = opaque;
-    //VMSocketState * s = NULL;
-    //VMSOCKET_DPRINTF("s: %p\n", s);
+
     switch(addr & 0xFF) {
     case VMSOCKET_WRITE_COMMIT_L_REG:
         VMSOCKET_DPRINTF("WriteCommit: count: %u.\n", val);
@@ -146,9 +146,8 @@ static void vmsocket_regs_writel(void *opaque, target_phys_addr_t addr,
         s->readed = 0;
         s->count = val;
         VMSOCKET_DPRINTF("Read request: %u\n", (unsigned) s->count);
-        pthread_t t;
-        pthread_create(&t, NULL, vmsocket_read_begin, s);
-        pthread_mutex_unlock(&s->mutex);
+        g_thread_pool_push(threadPool, s, NULL);
+        pthread_mutex_unlock(&s->mutex);//FIXME:not portable
         break;
     case VMSOCKET_INTR_SET_L_REG:
         s->interrupt = val;
@@ -169,7 +168,7 @@ static uint32_t vmsocket_regs_readl(void *opaque, target_phys_addr_t addr)
     case VMSOCKET_READ_END_L_REG:
         s->interrupt = 0;
         qemu_set_irq(s->pci_dev->irq[0], 0);
-        pthread_mutex_unlock(&s->mutex);
+        pthread_mutex_unlock(&s->mutex);//FIXME:not portable
         return s->readed;
     case VMSOCKET_INTR_GET_L_REG:
         return s->interrupt;
@@ -190,7 +189,13 @@ static const MemoryRegionOps regs_ops = {
 
 static int pci_vmsocket_initfn(PCIDevice *dev) 
 {
-    
+    g_thread_init(NULL);
+    threadPool = g_thread_pool_new(vmsocket_read_begin,
+                        NULL,
+                        -1,
+                        FALSE,
+                        NULL);
+
     PCI_VMSocketState *d = DO_UPCAST(PCI_VMSocketState, dev, dev);
     VMSocketState *s = &d->vmsocket_state;
     uint8_t *pci_conf = d->dev.config;
@@ -224,9 +229,9 @@ static int pci_vmsocket_initfn(PCIDevice *dev)
 
     pci_register_bar(&d->dev, 0,  PCI_BASE_ADDRESS_SPACE_MEMORY,
                      s->regs);
-    pci_register_bar(&d->dev, 1, PCI_BASE_ADDRESS_SPACE_MEMORY,
+    pci_register_bar(&d->dev, 1, PCI_BASE_ADDRESS_MEM_PREFETCH,
                      s->in_mem_region);
-    pci_register_bar(&d->dev, 2, PCI_BASE_ADDRESS_SPACE_MEMORY,
+    pci_register_bar(&d->dev, 2, PCI_BASE_ADDRESS_MEM_PREFETCH,
                      s->out_mem_region);
 
     s->interrupt = 0;
@@ -246,6 +251,12 @@ DeviceState *pci_vmsocket_init(PCIBus *bus)
 {
     return &pci_create_simple(bus, -1, "vmsocket")->qdev;
 }
+
+static Property vmsocket_pci_properties[] = {
+    DEFINE_PROP_UINT32("vmsocket_in", PCI_VMSocketState, vmsocket_state.inbuffer_size, 2),
+    DEFINE_PROP_UINT32("vmsocket_out", PCI_VMSocketState, vmsocket_state.outbuffer_size, 2),
+    DEFINE_PROP_END_OF_LIST(),
+};
 static void pci_vmsocket_exit(PCIDevice *dev)
 {
      PCI_VMSocketState *d = DO_UPCAST(PCI_VMSocketState, dev, dev);
@@ -253,9 +264,7 @@ static void pci_vmsocket_exit(PCIDevice *dev)
      memory_region_destroy(s->regs);
      memory_region_destroy(s->in_mem_region);
      memory_region_destroy(s->out_mem_region);
-    // msix_uninit_exclusive_bar(pci_dev);
-    // i
-    VMSOCKET_DPRINTF("exit");
+     VMSOCKET_DPRINTF("exit");
 }
 static void vmsocket_class_init(ObjectClass *klass, void *data)
 {
@@ -270,8 +279,9 @@ static void vmsocket_class_init(ObjectClass *klass, void *data)
     k->device_id = 0x6662;
     k->class_id = PCI_CLASS_OTHERS;
     //dc->vmsd = &vmstate_vga_pci;
-    //dc->props = vga_pci_properties;
+    dc->props = vmsocket_pci_properties;
     dc->desc = "vmsocket";
+    
 }
 
 static TypeInfo vmsocket_info = {
