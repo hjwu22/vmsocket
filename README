@@ -1,3 +1,6 @@
-Read the documentation in qemu-doc.html or on http://wiki.qemu.org
+A vmsocket implementation porting to qemu 1.0
 
-- QEMU team
+Most modifications are made at hw/vmsocket.c
+
+vmsocket is used at gvirtus project as a communication channel between guest and host
+
